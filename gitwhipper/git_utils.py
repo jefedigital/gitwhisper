@@ -1,5 +1,6 @@
 # gitwhipper/git_utils.py
 import git
+import os
 
 def get_repo_changes(repo_path='.'):
     repo = git.Repo(repo_path)
@@ -15,3 +16,10 @@ def commit_changes(repo_path='.', commit_message=None):
         repo.git.commit('-m', commit_message)
         return True
     return False
+
+def is_git_repo(path):
+    try:
+        _ = git.Repo(path).git_dir
+        return True
+    except git.exc.InvalidGitRepositoryError:
+        return False

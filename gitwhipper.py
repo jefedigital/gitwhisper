@@ -1,4 +1,5 @@
 import os
+import re
 import git
 from dotenv import load_dotenv
 from anthropic import Anthropic, HUMAN_PROMPT, AI_PROMPT
@@ -26,6 +27,15 @@ def is_substantial_change(diff, threshold=10):
     # Simple heuristic: consider it substantial if more than 10 lines changed
     return diff.count('\n') > threshold
 
+def clean_response(response):
+    # Remove any leading phrases
+    cleaned = re.sub(r'^.*?(?=\w+:)', '', response, flags=re.DOTALL).strip()
+    
+    # Remove "Summary:" and "Description:" labels if present
+    cleaned = re.sub(r'(Summary:|Description:)\s*', '', cleaned)
+    
+    return cleaned
+
 def generate_commit_summary(diff):
     prompt = f"""
     Analyze the following Git diff and create a concise, informative commit message. The message should summarize the main changes and their purpose.
@@ -42,8 +52,11 @@ def generate_commit_summary(diff):
     """
     response = get_claude_response(prompt)
     
-    # Process the response
-    lines = response.strip().split('\n')
+    # Clean the response
+    cleaned_response = clean_response(response)
+    
+    # Process the cleaned response
+    lines = cleaned_response.split('\n')
     summary = lines[0].strip()
     description = '\n'.join(lines[1:]).strip()
     

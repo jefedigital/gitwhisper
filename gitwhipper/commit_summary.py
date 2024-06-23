@@ -10,7 +10,7 @@ def generate_commit_summary(diff):
 
     {diff}
 
-    Provide ONLY the commit message in the following format, without any additional text or explanations:
+    Provide ONLY the commit message in the following format, without any additional text, explanations, or labels:
 
     [A brief one-line summary of the changes]
 

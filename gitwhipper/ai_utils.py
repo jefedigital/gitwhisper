@@ -16,6 +16,10 @@ def get_claude_response(prompt):
     return completion.completion
 
 def clean_response(response):
-    cleaned = re.sub(r'^.*?(?=\w+:)', '', response, flags=re.DOTALL).strip()
+    # Remove any leading phrases including "changes:"
+    cleaned = re.sub(r'^.*?(changes:)?\s*', '', response, flags=re.DOTALL).strip()
+    
+    # Remove "Summary:" and "Description:" labels if present
     cleaned = re.sub(r'(Summary:|Description:)\s*', '', cleaned)
+    
     return cleaned

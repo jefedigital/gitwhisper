@@ -1,8 +1,9 @@
 # gitwhipper/main.py
-from .git_utils import get_repo_changes, is_substantial_change, commit_changes
+from .git_utils import get_repo_changes, is_substantial_change
 from .commit_summary import generate_commit_summary
+from .ui.app import run_app
 
-def main():
+def core_functionality():
     print("GitWhipper initialized!")
     
     diff = get_repo_changes()
@@ -12,9 +13,15 @@ def main():
         suggested_commit_summary = generate_commit_summary(diff)
         print("\nSuggested Commit Message:")
         print(suggested_commit_summary)
-        # User interaction will be handled by the GUI
     else:
         print("No substantial changes detected.")
+
+def main():
+    print("Running core functionality...")
+    core_functionality()
+    
+    print("Starting GUI...")
+    run_app()
 
 if __name__ == "__main__":
     main()

@@ -28,6 +28,7 @@ class GitWhipperUI(QMainWindow):
         self.setCentralWidget(container)
 
     def generate_commit_message(self):
+        print("Generating commit message...")
         diff = get_repo_changes()
         if is_substantial_change(diff):
             suggested_commit_summary = generate_commit_summary(diff)
@@ -36,6 +37,7 @@ class GitWhipperUI(QMainWindow):
             self.commit_message.setPlainText("No substantial changes detected.")
 
     def commit_changes(self):
+        print("Committing changes...")
         commit_message = self.commit_message.toPlainText()
         if commit_changes(commit_message=commit_message):
             self.commit_message.setPlainText("Changes committed successfully.")
@@ -43,16 +45,11 @@ class GitWhipperUI(QMainWindow):
             self.commit_message.setPlainText("Failed to commit changes.")
 
 def run_app():
+    print("Initializing QApplication...")
     app = QApplication(sys.argv)
+    print("Creating GitWhipperUI...")
     window = GitWhipperUI()
+    print("Showing window...")
     window.show()
+    print("Entering Qt event loop...")
     sys.exit(app.exec())
-
-# gitwhipper/main.py
-from .ui.app import run_app
-
-def main():
-    run_app()
-
-if __name__ == "__main__":
-    main()

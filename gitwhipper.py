@@ -17,10 +17,85 @@ def get_claude_response(prompt):
     )
     return completion.completion
 
+def get_repo_changes(repo_path='.'):
+    repo = git.Repo(repo_path)
+    diff = repo.git.diff('--staged')
+    return diff
+
+def is_substantial_change(diff, threshold=10):
+    # Simple heuristic: consider it substantial if more than 10 lines changed
+    return diff.count('\n') > threshold
+
+def generate_commit_summary(diff):
+    prompt = f"""
+    As a Git commit message generator, your task is to analyze the following diff and create a concise, informative commit message. The message should summarize the main changes and their purpose.
+
+    Here's the diff:
+
+    {diff}
+
+    Please provide a commit message in the following format:
+    
+    Summary: A brief one-line summary of the changes
+    Description: A more detailed explanation of what was changed and why (2-3 sentences)
+    """
+    return get_claude_response(prompt)
+
+def get_user_choice(options):
+    while True:
+        for i, option in enumerate(options, 1):
+            print(f"{i}. {option}")
+        choice = input("Enter your choice (number): ")
+        if choice.isdigit() and 1 <= int(choice) <= len(options):
+            return int(choice)
+        print("Invalid choice. Please try again.")
+
+def user_interaction(commit_summary):
+    print("\nSuggested Commit Message:")
+    print(commit_summary)
+    
+    choice = get_user_choice(["Accept", "Modify", "Reject"])
+    
+    if choice == 1:  # Accept
+        return commit_summary
+    elif choice == 2:  # Modify
+        print("\nPlease enter your modified commit message.")
+        print("Enter 'END' on a new line when you're finished.")
+        lines = []
+        while True:
+            line = input()
+            if line == "END":
+                break
+            lines.append(line)
+        return "\n".join(lines)
+    else:  # Reject
+        return None
+
+def commit_changes(repo_path='.', commit_message=None):
+    if commit_message:
+        repo = git.Repo(repo_path)
+        repo.git.commit('-m', commit_message)
+        print("Changes committed successfully.")
+    else:
+        print("Commit aborted.")
+
 def main():
     print("GitWhipper initialized!")
-    response = get_claude_response("What's the main purpose of version control?")
-    print(f"Claude says: {response}")
+    
+    # Get changes from the Git repository
+    diff = get_repo_changes()
+    
+    # Check if changes are substantial
+    if is_substantial_change(diff):
+        print("Substantial changes detected. Generating commit summary...")
+        suggested_commit_summary = generate_commit_summary(diff)
+        
+        final_commit_message = user_interaction(suggested_commit_summary)
+        
+        if final_commit_message:
+            commit_changes(commit_message=final_commit_message)
+    else:
+        print("No substantial changes detected.")
 
 if __name__ == "__main__":
     main()

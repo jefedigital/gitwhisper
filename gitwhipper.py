@@ -28,18 +28,26 @@ def is_substantial_change(diff, threshold=10):
 
 def generate_commit_summary(diff):
     prompt = f"""
-    As a Git commit message generator, your task is to analyze the following diff and create a concise, informative commit message. The message should summarize the main changes and their purpose.
+    Analyze the following Git diff and create a concise, informative commit message. The message should summarize the main changes and their purpose.
 
     Here's the diff:
 
     {diff}
 
-    Please provide a commit message in the following format:
-    
-    Summary: A brief one-line summary of the changes
-    Description: A more detailed explanation of what was changed and why (2-3 sentences)
+    Provide ONLY the commit message in the following format, without any additional text or explanations:
+
+    [A brief one-line summary of the changes]
+
+    [A more detailed explanation of what was changed and why (2-3 sentences)]
     """
-    return get_claude_response(prompt)
+    response = get_claude_response(prompt)
+    
+    # Process the response
+    lines = response.strip().split('\n')
+    summary = lines[0].strip()
+    description = '\n'.join(lines[1:]).strip()
+    
+    return f"{summary}\n\n{description}"
 
 def get_user_choice(options):
     while True:

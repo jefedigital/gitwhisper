@@ -1,53 +1,33 @@
  # gitwhipper
 
+gitwhipper is a Git workflow assistant that integrates Large Language Models (LLMs) to enhance the development process. It aids developers by providing automated documentation generation and intelligent recommendations to improve Git workflows.
+
 ## Introduction
 
-gitwhipper is a Git workflow assistant that integrates Large Language Models (LLMs) to enhance the development process. It aids developers by automating various Git commands and generating helpful documentation like commit messages and code reviews. By leveraging LLMs, gitwhipper can provide intelligent suggestions to boost productivity.
+gitwhipper streamlines Git workflows by leveraging LLMs to provide commit message suggestions, automated changelog generation, and other productivity-enhancing features. By integrating these AI models directly into the Git client, gitwhipper aims to make software development more efficient and less tedious.
+
+Key capabilities include intelligent commit message generation, automated code review assistance, and project documentation creation. Rather than replacing the developer, gitwhipper augments human creativity and judgment - the developer remains firmly in control.
 
 ## Key Features
 
-- Automated commit message generation
-    - LLMs review changes and propose descriptive commit messages
-- Assisted code review
-    - LLMs analyze pull requests and provide feedback
-- Enhanced workflow with post-commit actions
-    - Flexible scripts to execute tasks after commits
-- Lightweight PyQt6 dashboard
-    - Track repos and view Git status
+- **Commit message generation** - LLMs suggest succinct, informative commit messages based on file changes. This speeds up the commit process and leads to improved project history.
+
+- **Code review assistance** - LLMs analyze proposed code changes and offer insights to enhance code quality and spot potential issues. This allows faster, higher-quality reviews.  
+
+- **Automated changelog creation** - Commit messages and PR titles are automatically compiled into a change log reflecting project improvements over time.
+
+- **Enhanced CLI** - Traditional Git CLI augmented with LLM-generated insights for commits, diffs, reverts and more.
 
 ## Installation
 
-Clone the repo:
+but wait, there's more
 
-```
-git clone https://github.com/jefedigital/gitwhipper.git
-```
-
-Install dependencies:
-
-```
-pip install -r requirements.txt
-```
-
-## Usage
-
-Here is an example workflow using gitwhipper:
-
-```
-# Make changes to project
-git add .
-
-# Generate commit message
-gitwhipper commit
-
-# Push changes  
-git push
-```
-
-The commit command will use LLMs to analyze changes and suggest a commit message.
-
-## Project Structure
-
-    .
-    ├── dashboard.py         # Main PyQt6 application
-    ├──
+1
+2
+3
+4
+5
+6
+6
+7
+10

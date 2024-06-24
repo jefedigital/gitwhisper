@@ -23,3 +23,28 @@ def is_git_repo(path):
         return True
     except git.exc.InvalidGitRepositoryError:
         return False
+
+def git_add_all(repo_path='.'):
+    try:
+        repo = git.Repo(repo_path)
+        repo.git.add(A=True)
+        return True, "All changes staged successfully."
+    except git.GitCommandError as e:
+        return False, f"Error staging changes: {str(e)}"
+
+def git_push(repo_path='.'):
+    try:
+        repo = git.Repo(repo_path)
+        origin = repo.remote(name='origin')
+        origin.push()
+        return True, "Changes pushed successfully."
+    except git.GitCommandError as e:
+        return False, f"Error pushing changes: {str(e)}"
+
+def get_unstaged_changes(repo_path='.'):
+    repo = git.Repo(repo_path)
+    return repo.git.diff()
+
+def get_staged_changes(repo_path='.'):
+    repo = git.Repo(repo_path)
+    return repo.git.diff('--staged')

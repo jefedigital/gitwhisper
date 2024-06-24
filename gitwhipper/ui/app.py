@@ -9,7 +9,7 @@ from PyQt6.QtWidgets import (QApplication, QMainWindow, QTextEdit, QPushButton,
 from PyQt6.QtCore import Qt
 from ..git_utils import (is_substantial_change, commit_changes, 
                          is_git_repo, git_add_all, git_push, get_unstaged_changes, 
-                         get_staged_changes, get_last_commit_id, get_staged_commits,
+                         get_staged_changes, get_commits, get_staged_files,
                          get_commit_details)
 from ..commit_summary import generate_commit_summary
 from ..readme_generator import generate_dynamic_readme
@@ -48,8 +48,8 @@ class GitWhipperUI(QMainWindow):
         left_column = QWidget()
         left_layout = QVBoxLayout(left_column)
 
-        # Staged Commits List
-        commits_group = QGroupBox("Staged Commits")
+        # Commits List
+        commits_group = QGroupBox("Commits")
         commits_layout = QVBoxLayout()
         self.commits_list = QListWidget()
         self.commits_list.itemClicked.connect(self.show_commit_details)
@@ -57,8 +57,23 @@ class GitWhipperUI(QMainWindow):
         commits_group.setLayout(commits_layout)
         left_layout.addWidget(commits_group)
 
-        # Commit Details (without Diff)
-        details_group = QGroupBox("Commit Details")
+        # Staged Files List
+        staged_group = QGroupBox("Staged Files")
+        staged_layout = QVBoxLayout()
+        self.staged_list = QListWidget()
+        self.staged_list.itemClicked.connect(self.show_staged_file_diff)
+        staged_layout.addWidget(self.staged_list)
+        staged_group.setLayout(staged_layout)
+        left_layout.addWidget(staged_group)
+
+        splitter.addWidget(left_column)
+
+        # Right Column
+        right_column = QWidget()
+        right_layout = QVBoxLayout(right_column)
+
+        # Commit Details
+        details_group = QGroupBox("Details")
         details_layout = QVBoxLayout()
 
         self.commit_id_label = QLabel("Commit ID:")
@@ -74,14 +89,9 @@ class GitWhipperUI(QMainWindow):
         details_layout.addWidget(self.description_text)
 
         details_group.setLayout(details_layout)
-        left_layout.addWidget(details_group)
+        right_layout.addWidget(details_group)
 
-        splitter.addWidget(left_column)
-
-        # Right Column (Diff)
-        right_column = QWidget()
-        right_layout = QVBoxLayout(right_column)
-
+        # Diff View
         diff_group = QGroupBox("Diff")
         diff_layout = QVBoxLayout()
         self.diff_text = QTextEdit()
@@ -93,9 +103,6 @@ class GitWhipperUI(QMainWindow):
         splitter.addWidget(right_column)
 
         main_layout.addWidget(splitter)
-
-        # Set the initial sizes of the splitter
-        splitter.setSizes([400, 600])  # Adjust these values as needed
 
         # Buttons
         button_layout = QHBoxLayout()
@@ -116,12 +123,11 @@ class GitWhipperUI(QMainWindow):
         self.push_button.clicked.connect(self.git_push)
         button_layout.addWidget(self.push_button)
 
-        main_layout.addLayout(button_layout)
-
-        # README Generation button
         self.readme_button = QPushButton("Generate README")
         self.readme_button.clicked.connect(self.generate_readme)
-        main_layout.addWidget(self.readme_button)
+        button_layout.addWidget(self.readme_button)
+
+        main_layout.addLayout(button_layout)
 
         container = QWidget()
         container.setLayout(main_layout)
@@ -176,7 +182,8 @@ class GitWhipperUI(QMainWindow):
             self.commit_button.setEnabled(True)
             self.push_button.setEnabled(True)
             self.readme_button.setEnabled(True)
-            self.update_staged_commits()
+            self.update_commits_list()
+            self.update_staged_files_list()
         else:
             self.git_status_label.setText("Not a Git repository")
             self.git_status_label.setStyleSheet("color: red")
@@ -187,31 +194,43 @@ class GitWhipperUI(QMainWindow):
             self.readme_button.setEnabled(False)
             self.clear_commit_details()
             self.commits_list.clear()
+            self.staged_list.clear()
 
-    def update_staged_commits(self):
+    def update_commits_list(self):
         self.commits_list.clear()
-        staged_commits = get_staged_commits(self.current_dir)
-        for commit in staged_commits:
+        commits = get_commits(self.current_dir)
+        for commit in commits:
             self.commits_list.addItem(f"{commit['id'][:7]} - {commit['summary']}")
+
+    def update_staged_files_list(self):
+        self.staged_list.clear()
+        staged_files = get_staged_files(self.current_dir)
+        for file in staged_files:
+            self.staged_list.addItem(file)
 
     def show_commit_details(self, item):
         commit_id = item.text().split(' - ')[0]
         details = get_commit_details(self.current_dir, commit_id)
         self.commit_id_label.setText(f"Commit ID: {commit_id}")
-        self.diff_text.setPlainText(details['diff'])
         self.summary_text.setPlainText(details['summary'])
         self.description_text.setPlainText(details['description'])
+        self.diff_text.setPlainText(details['diff'])
+
+    def show_staged_file_diff(self, item):
+        file_name = item.text()
+        diff = get_staged_changes(self.current_dir, file_name)
+        self.diff_text.setPlainText(diff)
 
     def clear_commit_details(self):
         self.commit_id_label.setText("Commit ID:")
-        self.diff_text.clear()
         self.summary_text.clear()
         self.description_text.clear()
+        self.diff_text.clear()
 
     def git_add(self):
         success, message = git_add_all(self.current_dir)
         self.show_message(message)
-        self.update_staged_commits()
+        self.update_staged_files_list()
 
     def generate_commit_message(self):
         diff = get_staged_changes(self.current_dir)
@@ -229,24 +248,17 @@ class GitWhipperUI(QMainWindow):
         commit_message = f"{summary}\n\n{description}"
         if commit_changes(self.current_dir, commit_message):
             self.show_message("Changes committed successfully.")
-            # Instead of clearing, update the staged commits list
-            self.update_staged_commits()
-            # Clear only the commit message fields
-            self.clear_commit_message_fields()
+            self.update_commits_list()
+            self.update_staged_files_list()
+            self.clear_commit_details()
         else:
             self.show_message("Failed to commit changes.")
-
-    def clear_commit_message_fields(self):
-        self.summary_text.clear()
-        self.description_text.clear()
 
     def git_push(self):
         success, message = git_push(self.current_dir)
         self.show_message(message)
         if success:
-            # Clear the staged commits list only after a successful push
-            self.commits_list.clear()
-            self.clear_commit_details()
+            self.update_commits_list()
 
     def generate_readme(self):
         if is_git_repo(self.current_dir):

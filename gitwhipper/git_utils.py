@@ -109,3 +109,26 @@ def get_commit_details(repo_path='.', commit_id='staged'):
                 'description': 'Could not retrieve commit details',
                 'diff': ''
             }
+        
+def get_commits(repo_path='.', count=10):
+    repo = git.Repo(repo_path)
+    commits = []
+    for commit in repo.iter_commits(max_count=count):
+        commits.append({
+            'id': commit.hexsha,
+            'summary': commit.summary,
+            'description': commit.message[len(commit.summary):].strip(),
+            'diff': repo.git.show(commit.hexsha)
+        })
+    return commits
+
+def get_staged_files(repo_path='.'):
+    repo = git.Repo(repo_path)
+    return [item.a_path for item in repo.index.diff('HEAD')]
+
+def get_staged_changes(repo_path='.', file_name=None):
+    repo = git.Repo(repo_path)
+    if file_name:
+        return repo.git.diff('--staged', file_name)
+    else:
+        return repo.git.diff('--staged')

@@ -183,43 +183,25 @@ def rebase_branch(repo_path: str = '.', onto_branch: str = None) -> Tuple[bool, 
 def push_branch(repo_path: str = '.', branch_name: str = None, remote: str = 'origin') -> Tuple[bool, str]:
     """Push a branch to a remote repository, explicitly setting upstream if necessary."""
     try:
-        repo = Repo(repo_path)
         if branch_name is None:
-            branch_name = repo.active_branch.name
+            # Get the current branch name
+            result = subprocess.run(['git', 'rev-parse', '--abbrev-ref', 'HEAD'], 
+                                    cwd=repo_path, capture_output=True, text=True, check=True)
+            branch_name = result.stdout.strip()
 
-        # Get the local branch
-        local_branch = repo.branches[branch_name]
-
-        # Check if the branch has an upstream set
+        # Try to push with -u option to set upstream
         try:
-            upstream = local_branch.tracking_branch()
-        except ValueError:
-            upstream = None
+            result = subprocess.run(['git', 'push', '-u', remote, branch_name], 
+                                    cwd=repo_path, capture_output=True, text=True, check=True)
+            return True, f"Successfully pushed and set upstream for {branch_name} to {remote}/{branch_name}"
+        except subprocess.CalledProcessError as e:
+            # If push fails, return the error message
+            return False, f"Failed to push: {e.stderr.strip()}"
 
-        if upstream is None:
-            # No upstream set, so we need to set it explicitly
-            try:
-                # Set the upstream branch
-                repo.git.branch('--set-upstream-to', f'{remote}/{branch_name}', branch_name)
-                # Now push the branch
-                repo.git.push(remote, branch_name)
-                return True, f"Set upstream and pushed {branch_name} to {remote}/{branch_name}"
-            except GitCommandError as e:
-                # If setting upstream fails, try pushing with -u option
-                try:
-                    repo.git.push('-u', remote, branch_name)
-                    return True, f"Pushed {branch_name} to {remote}/{branch_name} with -u option"
-                except GitCommandError as e2:
-                    return False, f"Failed to push and set upstream: {str(e2)}"
-        else:
-            # Upstream is set, perform a regular push
-            try:
-                repo.git.push(remote, branch_name)
-                return True, f"Pushed {branch_name} to {remote}"
-            except GitCommandError as e:
-                return False, f"Failed to push: {str(e)}"
+    except subprocess.CalledProcessError as e:
+        return False, f"An error occurred: {e.stderr.strip()}"
     except Exception as e:
-        return False, f"An error occurred: {str(e)}"
+        return False, f"An unexpected error occurred: {str(e)}"
 
 def pull_changes(repo_path: str = '.', remote: str = 'origin', branch: str = None) -> Tuple[bool, str]:
     """Pull changes from the remote counterpart of the current or specified branch."""

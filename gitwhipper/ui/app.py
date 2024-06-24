@@ -619,15 +619,15 @@ class GitWhipperUI(QMainWindow):
                 QMessageBox.warning(self, "Error", message)
 
     def push_branch(self, branch_name):
-        success, message = push_branch(self.current_dir, branch_name)
+        success, message = git_push_branch(self.current_dir, branch_name)
         if success:
             QMessageBox.information(self, "Success", message)
-            self.update_branching_panel()  # Refresh the branch list after successful push
         else:
-            QMessageBox.warning(self, "Error", f"Push failed: {message}")
+            QMessageBox.warning(self, "Error", message)
         
-        # Regardless of success or failure, update the UI to reflect current state
+        # Always update the UI to reflect current state
         self.update_git_status()
+        self.update_branching_panel()
 
     def pull_changes(self, branch_name):
         success, message = pull_changes(self.current_dir, branch=branch_name)

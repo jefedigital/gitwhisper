@@ -4,13 +4,15 @@ import sys
 import os
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QTextEdit, QPushButton, 
                              QVBoxLayout, QHBoxLayout, QWidget, QFileDialog, QLabel,
-                             QMessageBox, QGroupBox, QFormLayout, QListWidget, QSplitter)
+                             QMessageBox, QGroupBox, QFormLayout, QListWidget, QSplitter,
+                             QMenu, QMenuBar)
 from PyQt6.QtCore import Qt
 from ..git_utils import (is_substantial_change, commit_changes, 
                          is_git_repo, git_add_all, git_push, get_unstaged_changes, 
                          get_staged_changes, get_last_commit_id, get_staged_commits,
                          get_commit_details)
 from ..commit_summary import generate_commit_summary
+from ..readme_generator import generate_dynamic_readme
 
 class GitWhipperUI(QMainWindow):
     def __init__(self):
@@ -19,6 +21,11 @@ class GitWhipperUI(QMainWindow):
         self.setGeometry(100, 100, 1200, 800)
         self.current_dir = os.getcwd()
 
+        self.setup_ui()
+
+    def setup_ui(self):
+        self.setup_menu_bar()
+        
         main_layout = QVBoxLayout()
 
         # Directory navigation
@@ -111,12 +118,46 @@ class GitWhipperUI(QMainWindow):
 
         main_layout.addLayout(button_layout)
 
+        # README Generation button
+        self.readme_button = QPushButton("Generate README")
+        self.readme_button.clicked.connect(self.generate_readme)
+        main_layout.addWidget(self.readme_button)
+
         container = QWidget()
         container.setLayout(main_layout)
         self.setCentralWidget(container)
 
-        # Update git status after all UI elements are created
         self.update_git_status()
+
+    def setup_menu_bar(self):
+        menu_bar = QMenuBar(self)
+        self.setMenuBar(menu_bar)
+
+        # File menu
+        file_menu = QMenu("&File", self)
+        menu_bar.addMenu(file_menu)
+
+        browse_action = file_menu.addAction("&Browse Directory")
+        browse_action.triggered.connect(self.browse_directory)
+
+        generate_readme_action = file_menu.addAction("&Generate README")
+        generate_readme_action.triggered.connect(self.generate_readme)
+
+        exit_action = file_menu.addAction("&Exit")
+        exit_action.triggered.connect(self.close)
+
+        # Git menu
+        git_menu = QMenu("&Git", self)
+        menu_bar.addMenu(git_menu)
+
+        add_action = git_menu.addAction("&Add All")
+        add_action.triggered.connect(self.git_add)
+
+        commit_action = git_menu.addAction("&Commit")
+        commit_action.triggered.connect(self.commit_changes)
+
+        push_action = git_menu.addAction("&Push")
+        push_action.triggered.connect(self.git_push)
 
     def browse_directory(self):
         new_dir = QFileDialog.getExistingDirectory(self, "Select Directory")
@@ -134,6 +175,7 @@ class GitWhipperUI(QMainWindow):
             self.generate_button.setEnabled(True)
             self.commit_button.setEnabled(True)
             self.push_button.setEnabled(True)
+            self.readme_button.setEnabled(True)
             self.update_staged_commits()
         else:
             self.git_status_label.setText("Not a Git repository")
@@ -142,6 +184,7 @@ class GitWhipperUI(QMainWindow):
             self.generate_button.setEnabled(False)
             self.commit_button.setEnabled(False)
             self.push_button.setEnabled(False)
+            self.readme_button.setEnabled(False)
             self.clear_commit_details()
             self.commits_list.clear()
 
@@ -194,6 +237,12 @@ class GitWhipperUI(QMainWindow):
     def git_push(self):
         success, message = git_push(self.current_dir)
         self.show_message(message)
+
+    def generate_readme(self):
+        if is_git_repo(self.current_dir):
+            generate_dynamic_readme(self.current_dir, self)
+        else:
+            QMessageBox.warning(self, "Error", "Current directory is not a Git repository.")
 
     def show_message(self, message):
         QMessageBox.information(self, "GitWhipper", message)

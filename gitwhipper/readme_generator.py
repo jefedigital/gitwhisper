@@ -88,21 +88,51 @@ def generate_dynamic_readme(repo_path='.', parent=None):
 
     # Use Claude AI to generate README content
     prompt = f"""
-    Based on the following information about a Git repository, generate a comprehensive README.md file. 
+    Based on the following information about a Git repository, generate a comprehensive and professional README.md file. 
+    This project is a Git workflow assistant that integrates Large Language Models (LLMs) to enhance the development process.
+
     The README should include:
-    1. A title (the repository name)
-    2. A brief description of the project (infer from the file list and commit messages)
-    3. Installation instructions (if applicable, based on the types of files present)
-    4. Usage instructions (if applicable, based on the types of files present)
-    5. A list of main files/directories and their purposes
-    6. Recent changes (based on the commit messages provided, if any)
-    7. Contributing guidelines (a generic version)
-    8. License information (suggest MIT License if not evident)
+    1. Title: Use the repository name as the main title.
+    
+    2. Introduction: 
+       - Provide a concise overview of the project's purpose and primary features.
+       - Highlight the integration of LLMs in Git workflow assistance without using marketing language.
+       - Briefly mention how it aids in documentation generation and workflow enhancement.
+
+    3. Key Features:
+       - List and briefly explain the main functionalities of the tool.
+       - Describe how LLMs are utilized in specific features (e.g., commit message generation, code review assistance).
+       - Mention any unique aspects that set this tool apart from traditional Git clients.
+
+    4. Installation:
+       - Provide clear, step-by-step installation instructions.
+       - Include any dependencies or prerequisites.
+
+    5. Usage:
+       - Offer concise examples of how to use the main features.
+       - Include code snippets or command-line examples where appropriate.
+       - Explain how to leverage the LLM-assisted features in a typical workflow.
+
+    6. Project Structure:
+       - List the main files and directories.
+       - Provide a brief description of each component's purpose.
+
+    7. Recent Changes:
+       - If available, summarize recent updates or changes based on the provided commit messages.
+
+    8. Contributing:
+       - Outline how others can contribute to the project.
+       - Mention any coding standards or guidelines to follow.
+
+    9. License:
+       - State the project's license (suggest MIT License if not evident from the repository information).
+
+    Maintain a professional and informative tone throughout the document. Focus on providing clear, factual information about the project's capabilities and benefits, avoiding overly enthusiastic or marketing-like language.
 
     Repository Information:
     {repo_info}
 
-    Please provide ONLY the content for the README.md file, formatted in Markdown.
+    Please provide ONLY the content for the README.md file, formatted in Markdown. Ensure the document is well-structured, informative, and presents the project in a professional manner.
     """
 
     readme_content = ai_utils.get_claude_response(prompt)

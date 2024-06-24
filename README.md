@@ -1,42 +1,48 @@
  # gitwhipper
 
-gitwhipper is a Python project that provides utilities for working with Git repositories. 
+## Introduction
+
+gitwhipper is a Git workflow assistant that integrates Large Language Models (LLMs) to enhance the development process. It aids developers by providing automated documentation generation and workflow optimizations, utilizing the advanced capabilities of LLMs.
+
+This tool assists with typical Git operations like commit messaging, code reviewing, and documentation while seamlessly integrating the power of language models. By combining the version control functionality of Git with AI, gitwhipper aims to boost productivity and elevate collaboration.
+
+## Key Features
+
+- Automated commit message suggestions using LLMs
+- AI-assisted code reviews and feedback generation
+- Documentation enhancement through LLM summarization 
+- Integration of LLMs like GPT-3 directly into Git workflows
 
 ## Installation
 
-This project requires Python 3 and the following dependencies listed in `requirements.txt`:
+To install gitwhipper:
 
+1. Clone the repository 
+```
+git clone https://github.com/jefedigital/gitwhipper.git
+```
+
+2. Navigate into the project directory
+```
+cd gitwhipper
+```
+3. Install the dependencies
 ```
 pip install -r requirements.txt
 ```
 
 ## Usage
 
-The project provides some modules and scripts for fetching repository details, comparing commits, and other Git-related tasks. 
+To generate an AI-optimized commit message:
 
-See the main Python files for usage details:
+```
+gitwhipper suggest-commit
+```
 
-- `gitutils.py` - Module with Git helper functions
-- `commit_analyzer.py` - Provides commit comparison features  
+To get an AI code review:
 
-## Main Files
+``` 
+gitwhipper review mybranch
+```
 
-- `gitutils.py` - Git helper module
-- `commit_analyzer.py` - Commit analysis features
-- `requirements.txt` - Python dependency list
-- `.env` - Environment variable configuration
-
-## Recent Changes
-
-- Refactored UI layout
-- Added sequence of numbers from 1 to 11
-- Removed contents of test.txt
-- Added method to get last commit ID
-
-## Contributing
-
-Contributions in the form of issues and pull requests are welcome! See `CONTRIBUTING.md` for guidelines.
-
-## License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+## Project Structure

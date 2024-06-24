@@ -3,18 +3,18 @@ import sys
 import os
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QTextEdit, QPushButton, 
                              QVBoxLayout, QHBoxLayout, QWidget, QFileDialog, QLabel,
-                             QMessageBox)
+                             QMessageBox, QGroupBox, QFormLayout)
 from PyQt6.QtCore import Qt
 from ..git_utils import (get_repo_changes, is_substantial_change, commit_changes, 
                          is_git_repo, git_add_all, git_push, get_unstaged_changes, 
-                         get_staged_changes)
+                         get_staged_changes, get_last_commit_id)
 from ..commit_summary import generate_commit_summary
 
 class GitWhipperUI(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("GitWhipper")
-        self.setGeometry(100, 100, 800, 600)
+        self.setGeometry(100, 100, 900, 700)
         self.current_dir = os.getcwd()
 
         main_layout = QVBoxLayout()
@@ -33,13 +33,34 @@ class GitWhipperUI(QMainWindow):
         main_layout.addWidget(self.git_status_label)
 
         # Changes display
+        changes_group = QGroupBox("Changes")
+        changes_layout = QVBoxLayout()
         self.changes_text = QTextEdit()
         self.changes_text.setReadOnly(True)
-        main_layout.addWidget(self.changes_text)
+        changes_layout.addWidget(self.changes_text)
+        changes_group.setLayout(changes_layout)
+        main_layout.addWidget(changes_group)
 
-        # Commit message
-        self.commit_message = QTextEdit()
-        main_layout.addWidget(self.commit_message)
+        # Commit panel
+        commit_group = QGroupBox("Commit")
+        commit_layout = QFormLayout()
+        
+        self.commit_id_label = QLabel()
+        commit_layout.addRow("Commit ID:", self.commit_id_label)
+        
+        self.summary_label = QLabel("Summary:")
+        commit_layout.addRow(self.summary_label)
+        self.summary_text = QTextEdit()
+        self.summary_text.setMaximumHeight(50)
+        commit_layout.addRow(self.summary_text)
+        
+        self.description_label = QLabel("Description:")
+        commit_layout.addRow(self.description_label)
+        self.description_text = QTextEdit()
+        commit_layout.addRow(self.description_text)
+        
+        commit_group.setLayout(commit_layout)
+        main_layout.addWidget(commit_group)
 
         # Buttons
         button_layout = QHBoxLayout()
@@ -86,6 +107,7 @@ class GitWhipperUI(QMainWindow):
             self.commit_button.setEnabled(True)
             self.push_button.setEnabled(True)
             self.update_changes_display()
+            self.update_commit_panel()
         else:
             self.git_status_label.setText("Not a Git repository")
             self.git_status_label.setStyleSheet("color: red")
@@ -94,30 +116,50 @@ class GitWhipperUI(QMainWindow):
             self.commit_button.setEnabled(False)
             self.push_button.setEnabled(False)
             self.changes_text.clear()
+            self.clear_commit_panel()
 
     def update_changes_display(self):
         unstaged = get_unstaged_changes(self.current_dir)
         staged = get_staged_changes(self.current_dir)
         self.changes_text.setPlainText(f"Unstaged Changes:\n{unstaged}\n\nStaged Changes:\n{staged}")
 
+    def update_commit_panel(self):
+        staged_changes = get_staged_changes(self.current_dir)
+        if staged_changes.strip():
+            last_commit_id = get_last_commit_id(self.current_dir)
+            self.commit_id_label.setText(last_commit_id)
+        else:
+            self.clear_commit_panel()
+
+    def clear_commit_panel(self):
+        self.commit_id_label.clear()
+        self.summary_text.clear()
+        self.description_text.clear()
+
     def git_add(self):
         success, message = git_add_all(self.current_dir)
         self.show_message(message)
         self.update_changes_display()
+        self.update_commit_panel()
 
     def generate_commit_message(self):
         diff = get_staged_changes(self.current_dir)
         if is_substantial_change(diff):
             suggested_commit_summary = generate_commit_summary(diff)
-            self.commit_message.setPlainText(suggested_commit_summary)
+            summary, description = suggested_commit_summary.split('\n\n', 1)
+            self.summary_text.setPlainText(summary)
+            self.description_text.setPlainText(description)
         else:
-            self.commit_message.setPlainText("No substantial changes detected.")
+            self.show_message("No substantial changes detected.")
 
     def commit_changes(self):
-        commit_message = self.commit_message.toPlainText()
+        summary = self.summary_text.toPlainText()
+        description = self.description_text.toPlainText()
+        commit_message = f"{summary}\n\n{description}"
         if commit_changes(self.current_dir, commit_message):
             self.show_message("Changes committed successfully.")
             self.update_changes_display()
+            self.update_commit_panel()
         else:
             self.show_message("Failed to commit changes.")
 

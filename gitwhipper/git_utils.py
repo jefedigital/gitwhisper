@@ -48,3 +48,10 @@ def get_unstaged_changes(repo_path='.'):
 def get_staged_changes(repo_path='.'):
     repo = git.Repo(repo_path)
     return repo.git.diff('--staged')
+
+def get_last_commit_id(repo_path='.'):
+    try:
+        repo = git.Repo(repo_path)
+        return repo.head.object.hexsha[:7]  # Return first 7 characters of the commit hash
+    except:
+        return "No commits yet"

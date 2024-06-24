@@ -622,6 +622,7 @@ class GitWhipperUI(QMainWindow):
         success, message = push_branch(self.current_dir, branch_name)
         if success:
             QMessageBox.information(self, "Success", message)
+            self.update_branching_panel()  # Refresh the branch list after successful push
         else:
             QMessageBox.warning(self, "Error", message)
 

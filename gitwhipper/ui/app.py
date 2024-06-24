@@ -14,7 +14,10 @@ from PyQt6.QtGui import QPalette, QColor, QStandardItemModel, QStandardItem, QDr
 from ..git_utils import (is_substantial_change, commit_changes, 
                          is_git_repo, git_add_all, git_push, get_unstaged_changes, 
                          get_staged_changes, get_commits, get_staged_files,
-                         get_commit_details, get_modified_files)
+                         get_commit_details, get_modified_files, get_current_branch,
+                         list_branches, create_branch, switch_branch, delete_branch,
+                         merge_branch, rebase_branch, push_branch, pull_changes,
+                         create_and_switch_branch, rename_branch, get_branch_history)
 from ..commit_summary import generate_commit_summary
 from ..readme_generator import generate_dynamic_readme
 
@@ -90,8 +93,33 @@ class GitWhipperUI(QMainWindow):
         # Left column for Branching
         branching_group = QGroupBox("Branching")
         branching_layout = QVBoxLayout()
+
+        # Current branch display
+        self.current_branch_label = QLabel()
+        branching_layout.addWidget(self.current_branch_label)
+
+        # Branch list
         self.branch_list = QListWidget()
+        self.branch_list.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.branch_list.customContextMenuRequested.connect(self.show_branch_context_menu)
         branching_layout.addWidget(self.branch_list)
+
+        # Branch operations buttons
+        branch_buttons_layout = QHBoxLayout()
+        self.new_branch_button = QPushButton("New Branch")
+        self.new_branch_button.clicked.connect(self.create_new_branch)
+        branch_buttons_layout.addWidget(self.new_branch_button)
+
+        self.delete_branch_button = QPushButton("Delete Branch")
+        self.delete_branch_button.clicked.connect(self.delete_selected_branch)
+        branch_buttons_layout.addWidget(self.delete_branch_button)
+
+        self.merge_branch_button = QPushButton("Merge Branch")
+        self.merge_branch_button.clicked.connect(self.merge_selected_branch)
+        branch_buttons_layout.addWidget(self.merge_branch_button)
+
+        branching_layout.addLayout(branch_buttons_layout)
+
         branching_group.setLayout(branching_layout)
         staging_layout.addWidget(branching_group)
 
@@ -255,6 +283,7 @@ class GitWhipperUI(QMainWindow):
             self.update_commits_list()
             self.update_staged_files_list()
             self.update_file_tree()
+            self.update_branching_panel()
         else:
             self.git_status_label.setText("Not a Git repository")
             self.git_status_label.setStyleSheet("color: red")
@@ -490,6 +519,121 @@ class GitWhipperUI(QMainWindow):
 
         # Scroll to the top of the diff view
         self.diff_text.moveCursor(QTextCursor.MoveOperation.Start)
+
+    def update_branching_panel(self):
+        # Update current branch display
+        current_branch = get_current_branch(self.current_dir)
+        self.current_branch_label.setText(f"Current Branch: {current_branch}")
+
+        # Update branch list
+        self.branch_list.clear()
+        branches = list_branches(self.current_dir)
+        self.branch_list.addItems(branches)
+
+    def create_new_branch(self):
+        branch_name, ok = QInputDialog.getText(self, "New Branch", "Enter branch name:")
+        if ok and branch_name:
+            success = create_branch(self.current_dir, branch_name)
+            if success:
+                self.update_branching_panel()
+                QMessageBox.information(self, "Success", f"Branch '{branch_name}' created successfully.")
+            else:
+                QMessageBox.warning(self, "Error", f"Failed to create branch '{branch_name}'.")
+
+    def delete_selected_branch(self):
+        selected_items = self.branch_list.selectedItems()
+        if not selected_items:
+            QMessageBox.warning(self, "Warning", "No branch selected.")
+            return
+
+        branch_name = selected_items[0].text()
+        reply = QMessageBox.question(self, "Confirm Delete", f"Are you sure you want to delete branch '{branch_name}'?",
+                                     QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+        if reply == QMessageBox.StandardButton.Yes:
+            success, message = delete_branch(self.current_dir, branch_name)
+            if success:
+                self.update_branching_panel()
+                QMessageBox.information(self, "Success", message)
+            else:
+                QMessageBox.warning(self, "Error", message)
+
+    def merge_selected_branch(self):
+        selected_items = self.branch_list.selectedItems()
+        if not selected_items:
+            QMessageBox.warning(self, "Warning", "No branch selected.")
+            return
+
+        branch_name = selected_items[0].text()
+        reply = QMessageBox.question(self, "Confirm Merge", f"Are you sure you want to merge branch '{branch_name}' into the current branch?",
+                                     QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+        if reply == QMessageBox.StandardButton.Yes:
+            success, message = merge_branch(self.current_dir, branch_name)
+            if success:
+                self.update_branching_panel()
+                QMessageBox.information(self, "Success", message)
+            else:
+                QMessageBox.warning(self, "Error", message)
+
+    def show_branch_context_menu(self, position):
+        menu = QMenu()
+        switch_action = menu.addAction("Switch to Branch")
+        rename_action = menu.addAction("Rename Branch")
+        push_action = menu.addAction("Push Branch")
+        pull_action = menu.addAction("Pull Changes")
+
+        action = menu.exec(self.branch_list.mapToGlobal(position))
+        if action:
+            selected_items = self.branch_list.selectedItems()
+            if not selected_items:
+                return
+
+            branch_name = selected_items[0].text()
+
+            if action == switch_action:
+                self.switch_to_branch(branch_name)
+            elif action == rename_action:
+                self.rename_branch(branch_name)
+            elif action == push_action:
+                self.push_branch(branch_name)
+            elif action == pull_action:
+                self.pull_changes(branch_name)
+
+    def switch_to_branch(self, branch_name):
+        success, message = switch_branch(self.current_dir, branch_name)
+        if success:
+            self.update_branching_panel()
+            self.update_file_tree()
+            self.update_staged_files_list()
+            QMessageBox.information(self, "Success", message)
+        else:
+            QMessageBox.warning(self, "Error", message)
+
+    def rename_branch(self, old_name):
+        new_name, ok = QInputDialog.getText(self, "Rename Branch", "Enter new branch name:")
+        if ok and new_name:
+            success, message = rename_branch(self.current_dir, old_name, new_name)
+            if success:
+                self.update_branching_panel()
+                QMessageBox.information(self, "Success", message)
+            else:
+                QMessageBox.warning(self, "Error", message)
+
+    def push_branch(self, branch_name):
+        success, message = push_branch(self.current_dir, branch_name)
+        if success:
+            QMessageBox.information(self, "Success", message)
+        else:
+            QMessageBox.warning(self, "Error", message)
+
+    def pull_changes(self, branch_name):
+        success, message = pull_changes(self.current_dir, branch=branch_name)
+        if success:
+            self.update_branching_panel()
+            self.update_file_tree()
+            self.update_staged_files_list()
+            QMessageBox.information(self, "Success", message)
+        else:
+            QMessageBox.warning(self, "Error", message)
 
 def apply_stylesheet(app):
     app.setStyle("Fusion")

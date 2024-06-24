@@ -619,7 +619,7 @@ class GitWhipperUI(QMainWindow):
                 QMessageBox.warning(self, "Error", message)
 
     def push_branch(self, branch_name):
-        success, message = git_push_branch(self.current_dir, branch_name)
+        success, message = push_branch(self.current_dir, branch_name)
         if success:
             QMessageBox.information(self, "Success", message)
         else:

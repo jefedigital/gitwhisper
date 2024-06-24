@@ -29,7 +29,7 @@ def git_add_all(repo_path='.'):
     """Stage all changes in the repository."""
     try:
         repo = git.Repo(repo_path)
-        repo.git.add(A=True)
+        repo.add(A=True)
         return True, "All changes staged successfully."
     except git.GitCommandError as e:
         return False, f"Error staging changes: {str(e)}"
@@ -126,13 +126,14 @@ def get_staged_files(repo_path='.'):
     repo = git.Repo(repo_path)
     return [item.a_path for item in repo.index.diff('HEAD')]
 
-def get_staged_changes(repo_path='.', file_name=None):
+def get_staged_changes(repo_path='.'):
     repo = git.Repo(repo_path)
-    if file_name:
-        return repo.git.diff('--staged', file_name)
-    else:
-        return repo.git.diff('--staged')
-    
+    return repo.git.diff('--staged')
+
+def get_staged_files(repo_path='.'):
+    repo = git.Repo(repo_path)
+    return [item.a_path for item in repo.index.diff('HEAD')]
+
 def get_modified_files(repo_path='.'):
     repo = git.Repo(repo_path)
     return [item.a_path for item in repo.index.diff(None)] + repo.untracked_files

@@ -2,10 +2,12 @@
 
 import sys
 import os
+import git
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QTextEdit, QPushButton, 
                              QVBoxLayout, QHBoxLayout, QWidget, QFileDialog, QLabel,
                              QMessageBox, QGroupBox, QFormLayout, QListWidget, QSplitter,
-                             QMenu, QMenuBar, QTabWidget, QTreeView, QAbstractItemView)
+                             QMenu, QMenuBar, QTabWidget, QTreeView, QAbstractItemView,
+                             QInputDialog)
 from PyQt6.QtCore import Qt, QDir, QModelIndex
 from PyQt6.QtGui import QPalette, QColor, QStandardItemModel, QStandardItem, QDragEnterEvent, QDropEvent
 from ..git_utils import (is_substantial_change, commit_changes, 
@@ -44,6 +46,7 @@ class GitWhipperUI(QMainWindow):
         self.setGeometry(100, 100, 1400, 800)
         self.current_dir = os.getcwd()
         self.modified_files = set()
+        self.staged_files = set()
 
         self.setup_ui()
 
@@ -52,14 +55,24 @@ class GitWhipperUI(QMainWindow):
         
         main_layout = QVBoxLayout()
 
-        # Directory navigation
+        # Project section
+        project_group = QGroupBox("Project")
+        project_layout = QVBoxLayout()
+        
         dir_layout = QHBoxLayout()
         self.dir_label = QLabel(f"Current Directory: {self.current_dir}")
         dir_layout.addWidget(self.dir_label)
         self.browse_button = QPushButton("Browse")
         self.browse_button.clicked.connect(self.browse_directory)
         dir_layout.addWidget(self.browse_button)
-        main_layout.addLayout(dir_layout)
+        project_layout.addLayout(dir_layout)
+
+        self.readme_button = QPushButton("Generate README")
+        self.readme_button.clicked.connect(self.generate_readme)
+        project_layout.addWidget(self.readme_button)
+
+        project_group.setLayout(project_layout)
+        main_layout.addWidget(project_group)
 
         # Git repo status
         self.git_status_label = QLabel()
@@ -94,45 +107,32 @@ class GitWhipperUI(QMainWindow):
         self.file_tree.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.file_tree.customContextMenuRequested.connect(self.show_file_context_menu)
         files_layout.addWidget(self.file_tree)
+        
+        self.stage_all_button = QPushButton("Stage All")
+        self.stage_all_button.clicked.connect(self.git_add_all)
+        files_layout.addWidget(self.stage_all_button)
+        
         files_group.setLayout(files_layout)
         staging_layout.addWidget(files_group)
 
-        # Right column for Staged Files and buttons
-        right_column = QWidget()
-        right_layout = QVBoxLayout(right_column)
-
-        # Staged Files List
+        # Right column for Staged Files
         staged_group = QGroupBox("Staged Files")
         staged_layout = QVBoxLayout()
         self.staged_list = QListWidget()
         self.staged_list.setAcceptDrops(True)
-        self.staged_list.setDragDropMode(QAbstractItemView.DragDropMode.DropOnly)
+        self.staged_list.setDragEnabled(True)
+        self.staged_list.setDragDropMode(QAbstractItemView.DragDropMode.DragDrop)
         self.staged_list.itemClicked.connect(self.show_staged_file_diff)
+        self.staged_list.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.staged_list.customContextMenuRequested.connect(self.show_staged_file_context_menu)
         staged_layout.addWidget(self.staged_list)
-        staged_group.setLayout(staged_layout)
-        right_layout.addWidget(staged_group)
-
-        # Buttons for Staging tab
-        staging_button_layout = QHBoxLayout()
         
-        self.add_button = QPushButton("Git Add")
-        self.add_button.clicked.connect(self.git_add)
-        staging_button_layout.addWidget(self.add_button)
-
-        self.generate_button = QPushButton("Generate Commit Message")
-        self.generate_button.clicked.connect(self.generate_commit_message)
-        staging_button_layout.addWidget(self.generate_button)
-
         self.commit_button = QPushButton("Commit Changes")
         self.commit_button.clicked.connect(self.commit_changes)
-        staging_button_layout.addWidget(self.commit_button)
-
-        self.readme_button = QPushButton("Generate README")
-        self.readme_button.clicked.connect(self.generate_readme)
-        staging_button_layout.addWidget(self.readme_button)
-
-        right_layout.addLayout(staging_button_layout)
-        staging_layout.addWidget(right_column)
+        staged_layout.addWidget(self.commit_button)
+        
+        staged_group.setLayout(staged_layout)
+        staging_layout.addWidget(staged_group)
 
         self.tab_widget.addTab(staging_tab, "Staging")
 
@@ -172,10 +172,18 @@ class GitWhipperUI(QMainWindow):
         details_group.setLayout(details_layout)
         left_layout.addWidget(details_group)
 
-        # Git Push button
+        # Buttons for Commits tab
+        commits_button_layout = QHBoxLayout()
+        
+        self.generate_button = QPushButton("Generate Commit Message")
+        self.generate_button.clicked.connect(self.generate_commit_message)
+        commits_button_layout.addWidget(self.generate_button)
+
         self.push_button = QPushButton("Git Push")
         self.push_button.clicked.connect(self.git_push)
-        left_layout.addWidget(self.push_button)
+        commits_button_layout.addWidget(self.push_button)
+
+        left_layout.addLayout(commits_button_layout)
 
         commits_layout.addWidget(left_column)
 
@@ -238,7 +246,7 @@ class GitWhipperUI(QMainWindow):
         if is_git_repo(self.current_dir):
             self.git_status_label.setText("Git repository detected")
             self.git_status_label.setStyleSheet("color: green")
-            self.add_button.setEnabled(True)
+            self.stage_all_button.setEnabled(True)
             self.generate_button.setEnabled(True)
             self.commit_button.setEnabled(True)
             self.push_button.setEnabled(True)
@@ -249,7 +257,7 @@ class GitWhipperUI(QMainWindow):
         else:
             self.git_status_label.setText("Not a Git repository")
             self.git_status_label.setStyleSheet("color: red")
-            self.add_button.setEnabled(False)
+            self.stage_all_button.setEnabled(False)
             self.generate_button.setEnabled(False)
             self.commit_button.setEnabled(False)
             self.push_button.setEnabled(False)
@@ -260,18 +268,50 @@ class GitWhipperUI(QMainWindow):
 
     def update_file_tree(self):
         self.modified_files = set(get_modified_files(self.current_dir))
+        self.staged_files = set(get_staged_files(self.current_dir))
         self.file_model = FileSystemModel(self.current_dir)
         self.file_tree.setModel(self.file_model)
-        self.highlight_modified_files(self.file_model.invisibleRootItem())
+        self.highlight_files(self.file_model.invisibleRootItem())
 
-    def highlight_modified_files(self, parent_item):
+    def highlight_files(self, parent_item):
         for row in range(parent_item.rowCount()):
             child_item = parent_item.child(row)
             file_path = child_item.data(Qt.ItemDataRole.UserRole)
             if file_path in self.modified_files:
                 child_item.setForeground(QColor('red'))
+            if file_path in self.staged_files:
+                child_item.setForeground(QColor('green'))
             if child_item.hasChildren():
-                self.highlight_modified_files(child_item)
+                self.highlight_files(child_item)
+
+    def git_add_file(self, file_path):
+        try:
+            repo = git.Repo(self.current_dir)
+            repo.git.add(file_path)
+            self.update_staged_files_list()
+            self.update_file_tree()
+            # Removed the confirmation popup
+        except git.GitCommandError as e:
+            QMessageBox.warning(self, "Error", f"Failed to add {file_path}: {str(e)}")
+
+    def git_remove_file(self, file_path):
+        try:
+            repo = git.Repo(self.current_dir)
+            repo.git.reset(file_path)
+            self.update_staged_files_list()
+            self.update_file_tree()
+            # Removed the confirmation popup
+        except git.GitCommandError as e:
+            QMessageBox.warning(self, "Error", f"Failed to remove {file_path} from staging: {str(e)}")
+
+    def git_add_all(self):
+        try:
+            repo = git.Repo(self.current_dir)
+            repo.git.add(A=True)
+            self.update_staged_files_list()
+            self.update_file_tree()
+        except git.GitCommandError as e:
+            QMessageBox.warning(self, "Error", f"Failed to stage all files: {str(e)}")
 
     def show_file_context_menu(self, position):
         index = self.file_tree.indexAt(position)
@@ -288,20 +328,45 @@ class GitWhipperUI(QMainWindow):
         if action == stage_action:
             self.git_add_file(file_path)
 
-    def git_add_file(self, file_path):
-        # Implement git add for a single file
-        # Update the staged files list and file tree
-        pass
+    def show_staged_file_context_menu(self, position):
+        item = self.staged_list.itemAt(position)
+        if item is None:
+            return
 
-    # Override dragEnterEvent and dropEvent for the staged_list
+        file_path = item.text()
+
+        menu = QMenu()
+        unstage_action = menu.addAction("Unstage")
+        action = menu.exec(self.staged_list.viewport().mapToGlobal(position))
+
+        if action == unstage_action:
+            self.git_remove_file(file_path)
+
+    def show_staged_file_context_menu(self, position):
+        item = self.staged_list.itemAt(position)
+        if item is None:
+            return
+
+        file_path = item.text()
+
+        menu = QMenu()
+        unstage_action = menu.addAction("Unstage")
+        action = menu.exec(self.staged_list.viewport().mapToGlobal(position))
+
+        if action == unstage_action:
+            self.git_remove_file(file_path)
+
     def dragEnterEvent(self, event: QDragEnterEvent):
         if event.mimeData().hasText():
             event.acceptProposedAction()
 
     def dropEvent(self, event: QDropEvent):
         file_path = event.mimeData().text()
-        self.git_add_file(file_path)
-        event.acceptProposedAction()
+        if event.source() == self.file_tree:
+            self.git_add_file(file_path)
+        elif event.source() == self.staged_list:
+            self.git_remove_file(file_path)
+        event.acceptProposedAction()   
 
     def update_commits_list(self):
         self.commits_list.clear()
@@ -341,25 +406,39 @@ class GitWhipperUI(QMainWindow):
 
     def generate_commit_message(self):
         diff = get_staged_changes(self.current_dir)
-        if is_substantial_change(diff):
-            suggested_commit_summary = generate_commit_summary(diff)
-            summary, description = suggested_commit_summary.split('\n\n', 1)
-            self.summary_text.setPlainText(summary)
-            self.description_text.setPlainText(description)
-        else:
-            self.show_message("No substantial changes detected.")
+        if not diff:
+            QMessageBox.warning(self, "Warning", "No changes staged for commit message generation.")
+            return
+
+        ai_commit_message = generate_commit_summary(diff)
+        self.summary_text.setPlainText(ai_commit_message.split('\n\n')[0])
+        self.description_text.setPlainText('\n\n'.join(ai_commit_message.split('\n\n')[1:]))
 
     def commit_changes(self):
-        summary = self.summary_text.toPlainText()
-        description = self.description_text.toPlainText()
-        commit_message = f"{summary}\n\n{description}"
-        if commit_changes(self.current_dir, commit_message):
-            self.show_message("Changes committed successfully.")
-            self.update_commits_list()
-            self.update_staged_files_list()
-            self.clear_commit_details()
+        # First, generate the AI commit message
+        diff = get_staged_changes(self.current_dir)
+        if not diff:
+            QMessageBox.warning(self, "Warning", "No changes staged for commit.")
+            return
+
+        ai_commit_message = generate_commit_summary(diff)
+
+        # Show the generated message to the user and allow them to edit it
+        commit_message, ok = QInputDialog.getMultiLineText(
+            self, 'Commit Message', 'Edit the commit message:', ai_commit_message)
+
+        if ok and commit_message:
+            try:
+                repo = git.Repo(self.current_dir)
+                repo.index.commit(commit_message)
+                self.update_commits_list()
+                self.update_staged_files_list()
+                self.update_file_tree()
+                QMessageBox.information(self, "Success", "Changes committed successfully.")
+            except git.GitCommandError as e:
+                QMessageBox.warning(self, "Error", f"Failed to commit changes: {str(e)}")
         else:
-            self.show_message("Failed to commit changes.")
+            QMessageBox.information(self, "Info", "Commit cancelled.")
 
     def git_push(self):
         success, message = git_push(self.current_dir)

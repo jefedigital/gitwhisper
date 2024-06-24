@@ -132,3 +132,7 @@ def get_staged_changes(repo_path='.', file_name=None):
         return repo.git.diff('--staged', file_name)
     else:
         return repo.git.diff('--staged')
+    
+def get_modified_files(repo_path='.'):
+    repo = git.Repo(repo_path)
+    return [item.a_path for item in repo.index.diff(None)] + repo.untracked_files

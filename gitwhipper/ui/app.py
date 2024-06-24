@@ -5,21 +5,45 @@ import os
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QTextEdit, QPushButton, 
                              QVBoxLayout, QHBoxLayout, QWidget, QFileDialog, QLabel,
                              QMessageBox, QGroupBox, QFormLayout, QListWidget, QSplitter,
-                             QMenu, QMenuBar)
-from PyQt6.QtCore import Qt
+                             QMenu, QMenuBar, QTabWidget, QTreeView, QAbstractItemView)
+from PyQt6.QtCore import Qt, QDir, QModelIndex
+from PyQt6.QtGui import QPalette, QColor, QStandardItemModel, QStandardItem, QDragEnterEvent, QDropEvent
 from ..git_utils import (is_substantial_change, commit_changes, 
                          is_git_repo, git_add_all, git_push, get_unstaged_changes, 
                          get_staged_changes, get_commits, get_staged_files,
-                         get_commit_details)
+                         get_commit_details, get_modified_files)
 from ..commit_summary import generate_commit_summary
 from ..readme_generator import generate_dynamic_readme
+
+class FileSystemModel(QStandardItemModel):
+    def __init__(self, root_path):
+        super().__init__()
+        self.root_path = root_path
+        self.setHorizontalHeaderLabels(['Name'])
+        self.populate_model()
+
+    def populate_model(self):
+        root_node = self.invisibleRootItem()
+        self.add_files(root_node, self.root_path)
+
+    def add_files(self, parent, path):
+        for name in os.listdir(path):
+            if name.startswith('.'):
+                continue
+            full_path = os.path.join(path, name)
+            item = QStandardItem(name)
+            item.setData(full_path, Qt.ItemDataRole.UserRole)
+            parent.appendRow(item)
+            if os.path.isdir(full_path):
+                self.add_files(item, full_path)
 
 class GitWhipperUI(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("GitWhipper")
-        self.setGeometry(100, 100, 1200, 800)
+        self.setGeometry(100, 100, 1400, 800)
         self.current_dir = os.getcwd()
+        self.modified_files = set()
 
         self.setup_ui()
 
@@ -41,36 +65,93 @@ class GitWhipperUI(QMainWindow):
         self.git_status_label = QLabel()
         main_layout.addWidget(self.git_status_label)
 
-        # Splitter for left and right columns
-        splitter = QSplitter(Qt.Orientation.Horizontal)
+        # Create tab widget
+        self.tab_widget = QTabWidget()
+        main_layout.addWidget(self.tab_widget)
 
-        # Left Column
-        left_column = QWidget()
-        left_layout = QVBoxLayout(left_column)
+        # Staging tab
+        staging_tab = QWidget()
+        staging_layout = QHBoxLayout(staging_tab)
 
-        # Commits List
-        commits_group = QGroupBox("Commits")
-        commits_layout = QVBoxLayout()
-        self.commits_list = QListWidget()
-        self.commits_list.itemClicked.connect(self.show_commit_details)
-        commits_layout.addWidget(self.commits_list)
-        commits_group.setLayout(commits_layout)
-        left_layout.addWidget(commits_group)
+        # Left column for Branching
+        branching_group = QGroupBox("Branching")
+        branching_layout = QVBoxLayout()
+        self.branch_list = QListWidget()
+        branching_layout.addWidget(self.branch_list)
+        branching_group.setLayout(branching_layout)
+        staging_layout.addWidget(branching_group)
+
+        # Middle column for Files
+        files_group = QGroupBox("Files")
+        files_layout = QVBoxLayout()
+        self.file_tree = QTreeView()
+        self.file_tree.setDragEnabled(True)
+        self.file_tree.setAcceptDrops(False)
+        self.file_tree.setDropIndicatorShown(True)
+        self.file_tree.setDragDropMode(QAbstractItemView.DragDropMode.DragOnly)
+        self.file_model = FileSystemModel(self.current_dir)
+        self.file_tree.setModel(self.file_model)
+        self.file_tree.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.file_tree.customContextMenuRequested.connect(self.show_file_context_menu)
+        files_layout.addWidget(self.file_tree)
+        files_group.setLayout(files_layout)
+        staging_layout.addWidget(files_group)
+
+        # Right column for Staged Files and buttons
+        right_column = QWidget()
+        right_layout = QVBoxLayout(right_column)
 
         # Staged Files List
         staged_group = QGroupBox("Staged Files")
         staged_layout = QVBoxLayout()
         self.staged_list = QListWidget()
+        self.staged_list.setAcceptDrops(True)
+        self.staged_list.setDragDropMode(QAbstractItemView.DragDropMode.DropOnly)
         self.staged_list.itemClicked.connect(self.show_staged_file_diff)
         staged_layout.addWidget(self.staged_list)
         staged_group.setLayout(staged_layout)
-        left_layout.addWidget(staged_group)
+        right_layout.addWidget(staged_group)
 
-        splitter.addWidget(left_column)
+        # Buttons for Staging tab
+        staging_button_layout = QHBoxLayout()
+        
+        self.add_button = QPushButton("Git Add")
+        self.add_button.clicked.connect(self.git_add)
+        staging_button_layout.addWidget(self.add_button)
 
-        # Right Column
-        right_column = QWidget()
-        right_layout = QVBoxLayout(right_column)
+        self.generate_button = QPushButton("Generate Commit Message")
+        self.generate_button.clicked.connect(self.generate_commit_message)
+        staging_button_layout.addWidget(self.generate_button)
+
+        self.commit_button = QPushButton("Commit Changes")
+        self.commit_button.clicked.connect(self.commit_changes)
+        staging_button_layout.addWidget(self.commit_button)
+
+        self.readme_button = QPushButton("Generate README")
+        self.readme_button.clicked.connect(self.generate_readme)
+        staging_button_layout.addWidget(self.readme_button)
+
+        right_layout.addLayout(staging_button_layout)
+        staging_layout.addWidget(right_column)
+
+        self.tab_widget.addTab(staging_tab, "Staging")
+
+        # Commits tab
+        commits_tab = QWidget()
+        commits_layout = QHBoxLayout(commits_tab)
+
+        # Left column for Commits list and Details
+        left_column = QWidget()
+        left_layout = QVBoxLayout(left_column)
+
+        # Commits List
+        commits_group = QGroupBox("Commits")
+        commits_list_layout = QVBoxLayout()
+        self.commits_list = QListWidget()
+        self.commits_list.itemClicked.connect(self.show_commit_details)
+        commits_list_layout.addWidget(self.commits_list)
+        commits_group.setLayout(commits_list_layout)
+        left_layout.addWidget(commits_group)
 
         # Commit Details
         details_group = QGroupBox("Details")
@@ -89,45 +170,25 @@ class GitWhipperUI(QMainWindow):
         details_layout.addWidget(self.description_text)
 
         details_group.setLayout(details_layout)
-        right_layout.addWidget(details_group)
+        left_layout.addWidget(details_group)
 
-        # Diff View
+        # Git Push button
+        self.push_button = QPushButton("Git Push")
+        self.push_button.clicked.connect(self.git_push)
+        left_layout.addWidget(self.push_button)
+
+        commits_layout.addWidget(left_column)
+
+        # Right column for Diff View
         diff_group = QGroupBox("Diff")
         diff_layout = QVBoxLayout()
         self.diff_text = QTextEdit()
         self.diff_text.setReadOnly(True)
         diff_layout.addWidget(self.diff_text)
         diff_group.setLayout(diff_layout)
-        right_layout.addWidget(diff_group)
+        commits_layout.addWidget(diff_group)
 
-        splitter.addWidget(right_column)
-
-        main_layout.addWidget(splitter)
-
-        # Buttons
-        button_layout = QHBoxLayout()
-        
-        self.add_button = QPushButton("Git Add")
-        self.add_button.clicked.connect(self.git_add)
-        button_layout.addWidget(self.add_button)
-
-        self.generate_button = QPushButton("Generate Commit Message")
-        self.generate_button.clicked.connect(self.generate_commit_message)
-        button_layout.addWidget(self.generate_button)
-
-        self.commit_button = QPushButton("Commit Changes")
-        self.commit_button.clicked.connect(self.commit_changes)
-        button_layout.addWidget(self.commit_button)
-
-        self.push_button = QPushButton("Git Push")
-        self.push_button.clicked.connect(self.git_push)
-        button_layout.addWidget(self.push_button)
-
-        self.readme_button = QPushButton("Generate README")
-        self.readme_button.clicked.connect(self.generate_readme)
-        button_layout.addWidget(self.readme_button)
-
-        main_layout.addLayout(button_layout)
+        self.tab_widget.addTab(commits_tab, "Commits")
 
         container = QWidget()
         container.setLayout(main_layout)
@@ -184,6 +245,7 @@ class GitWhipperUI(QMainWindow):
             self.readme_button.setEnabled(True)
             self.update_commits_list()
             self.update_staged_files_list()
+            self.update_file_tree()
         else:
             self.git_status_label.setText("Not a Git repository")
             self.git_status_label.setStyleSheet("color: red")
@@ -195,6 +257,51 @@ class GitWhipperUI(QMainWindow):
             self.clear_commit_details()
             self.commits_list.clear()
             self.staged_list.clear()
+
+    def update_file_tree(self):
+        self.modified_files = set(get_modified_files(self.current_dir))
+        self.file_model = FileSystemModel(self.current_dir)
+        self.file_tree.setModel(self.file_model)
+        self.highlight_modified_files(self.file_model.invisibleRootItem())
+
+    def highlight_modified_files(self, parent_item):
+        for row in range(parent_item.rowCount()):
+            child_item = parent_item.child(row)
+            file_path = child_item.data(Qt.ItemDataRole.UserRole)
+            if file_path in self.modified_files:
+                child_item.setForeground(QColor('red'))
+            if child_item.hasChildren():
+                self.highlight_modified_files(child_item)
+
+    def show_file_context_menu(self, position):
+        index = self.file_tree.indexAt(position)
+        if not index.isValid():
+            return
+
+        item = self.file_model.itemFromIndex(index)
+        file_path = item.data(Qt.ItemDataRole.UserRole)
+
+        menu = QMenu()
+        stage_action = menu.addAction("Git Add")
+        action = menu.exec(self.file_tree.viewport().mapToGlobal(position))
+
+        if action == stage_action:
+            self.git_add_file(file_path)
+
+    def git_add_file(self, file_path):
+        # Implement git add for a single file
+        # Update the staged files list and file tree
+        pass
+
+    # Override dragEnterEvent and dropEvent for the staged_list
+    def dragEnterEvent(self, event: QDragEnterEvent):
+        if event.mimeData().hasText():
+            event.acceptProposedAction()
+
+    def dropEvent(self, event: QDropEvent):
+        file_path = event.mimeData().text()
+        self.git_add_file(file_path)
+        event.acceptProposedAction()
 
     def update_commits_list(self):
         self.commits_list.clear()
@@ -269,8 +376,72 @@ class GitWhipperUI(QMainWindow):
     def show_message(self, message):
         QMessageBox.information(self, "GitWhipper", message)
 
+def apply_stylesheet(app):
+    app.setStyle("Fusion")
+    
+    palette = QPalette()
+    palette.setColor(QPalette.ColorRole.Window, QColor(53, 53, 53))
+    palette.setColor(QPalette.ColorRole.WindowText, Qt.GlobalColor.white)
+    palette.setColor(QPalette.ColorRole.Base, QColor(25, 25, 25))
+    palette.setColor(QPalette.ColorRole.AlternateBase, QColor(53, 53, 53))
+    palette.setColor(QPalette.ColorRole.ToolTipBase, Qt.GlobalColor.white)
+    palette.setColor(QPalette.ColorRole.ToolTipText, Qt.GlobalColor.white)
+    palette.setColor(QPalette.ColorRole.Text, Qt.GlobalColor.white)
+    palette.setColor(QPalette.ColorRole.Button, QColor(53, 53, 53))
+    palette.setColor(QPalette.ColorRole.ButtonText, Qt.GlobalColor.white)
+    palette.setColor(QPalette.ColorRole.BrightText, Qt.GlobalColor.red)
+    palette.setColor(QPalette.ColorRole.Link, QColor(42, 130, 218))
+    palette.setColor(QPalette.ColorRole.Highlight, QColor(42, 130, 218))
+    palette.setColor(QPalette.ColorRole.HighlightedText, Qt.GlobalColor.black)
+    app.setPalette(palette)
+
+    css = """
+    QMainWindow {
+        border: 1px solid #76797C;
+    }
+    QToolTip {
+        color: #ffffff;
+        background-color: #2a82da;
+        border: 1px solid white;
+    }
+    QStatusBar {
+        background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                                          stop:0 #4D4D4D, stop:1 #292929);
+    }
+    QListWidget, QTextEdit {
+        background-color: #1e1e1e;
+        border: 1px solid #3A3939;
+        color: #eff0f1;
+    }
+    QListWidget::item:selected {
+        background-color: #2a82da;
+    }
+    QPushButton {
+        border: 1px solid #455364;
+        border-radius: 2px;
+        background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
+                                          stop: 0 #344a5f, stop: 1 #263845);
+        min-width: 80px;
+    }
+    QPushButton:hover {
+        background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
+                                          stop: 0 #3e5a7d, stop: 1 #2d4a63);
+    }
+    QPushButton:pressed {
+        background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
+                                          stop: 0 #2d4a63, stop: 1 #3e5a7d);
+    }
+    QLineEdit {
+        background-color: #1e1e1e;
+        border: 1px solid #3A3939;
+        color: #eff0f1;
+    }
+    """
+    app.setStyleSheet(css)
+
 def run_app():
     app = QApplication(sys.argv)
+    apply_stylesheet(app)
     window = GitWhipperUI()
     window.show()
     sys.exit(app.exec())

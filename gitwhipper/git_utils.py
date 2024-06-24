@@ -181,7 +181,7 @@ def rebase_branch(repo_path: str = '.', onto_branch: str = None) -> Tuple[bool, 
         return False, str(e)
 
 def push_branch(repo_path: str = '.', branch_name: str = None, remote: str = 'origin') -> Tuple[bool, str]:
-    """Push a branch to a remote repository, setting upstream if necessary."""
+    """Push a branch to a remote repository, explicitly setting upstream if necessary."""
     try:
         repo = Repo(repo_path)
         if branch_name is None:
@@ -197,12 +197,20 @@ def push_branch(repo_path: str = '.', branch_name: str = None, remote: str = 'or
             upstream = None
 
         if upstream is None:
-            # No upstream set, so we need to set it
+            # No upstream set, so we need to set it explicitly
             try:
-                repo.git.push('--set-upstream', remote, branch_name)
-                return True, f"Pushed and set upstream for {branch_name} to {remote}/{branch_name}"
+                # Set the upstream branch
+                repo.git.branch('--set-upstream-to', f'{remote}/{branch_name}', branch_name)
+                # Now push the branch
+                repo.git.push(remote, branch_name)
+                return True, f"Set upstream and pushed {branch_name} to {remote}/{branch_name}"
             except GitCommandError as e:
-                return False, f"Failed to push and set upstream: {str(e)}"
+                # If setting upstream fails, try pushing with -u option
+                try:
+                    repo.git.push('-u', remote, branch_name)
+                    return True, f"Pushed {branch_name} to {remote}/{branch_name} with -u option"
+                except GitCommandError as e2:
+                    return False, f"Failed to push and set upstream: {str(e2)}"
         else:
             # Upstream is set, perform a regular push
             try:

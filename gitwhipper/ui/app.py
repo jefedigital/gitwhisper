@@ -34,8 +34,12 @@ class GitWhipperUI(QMainWindow):
         self.git_status_label = QLabel()
         main_layout.addWidget(self.git_status_label)
 
-        # Splitter for commits list and details
+        # Splitter for left and right columns
         splitter = QSplitter(Qt.Orientation.Horizontal)
+
+        # Left Column
+        left_column = QWidget()
+        left_layout = QVBoxLayout(left_column)
 
         # Staged Commits List
         commits_group = QGroupBox("Staged Commits")
@@ -44,19 +48,14 @@ class GitWhipperUI(QMainWindow):
         self.commits_list.itemClicked.connect(self.show_commit_details)
         commits_layout.addWidget(self.commits_list)
         commits_group.setLayout(commits_layout)
-        splitter.addWidget(commits_group)
+        left_layout.addWidget(commits_group)
 
-        # Commit Details
+        # Commit Details (without Diff)
         details_group = QGroupBox("Commit Details")
         details_layout = QVBoxLayout()
-        
+
         self.commit_id_label = QLabel("Commit ID:")
         details_layout.addWidget(self.commit_id_label)
-
-        self.diff_text = QTextEdit()
-        self.diff_text.setReadOnly(True)
-        details_layout.addWidget(QLabel("Diff:"))
-        details_layout.addWidget(self.diff_text)
 
         self.summary_text = QTextEdit()
         self.summary_text.setMaximumHeight(50)
@@ -68,9 +67,28 @@ class GitWhipperUI(QMainWindow):
         details_layout.addWidget(self.description_text)
 
         details_group.setLayout(details_layout)
-        splitter.addWidget(details_group)
+        left_layout.addWidget(details_group)
+
+        splitter.addWidget(left_column)
+
+        # Right Column (Diff)
+        right_column = QWidget()
+        right_layout = QVBoxLayout(right_column)
+
+        diff_group = QGroupBox("Diff")
+        diff_layout = QVBoxLayout()
+        self.diff_text = QTextEdit()
+        self.diff_text.setReadOnly(True)
+        diff_layout.addWidget(self.diff_text)
+        diff_group.setLayout(diff_layout)
+        right_layout.addWidget(diff_group)
+
+        splitter.addWidget(right_column)
 
         main_layout.addWidget(splitter)
+
+        # Set the initial sizes of the splitter
+        splitter.setSizes([400, 600])  # Adjust these values as needed
 
         # Buttons
         button_layout = QHBoxLayout()

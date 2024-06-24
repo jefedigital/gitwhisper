@@ -72,10 +72,13 @@ def get_staged_commits(repo_path='.'):
     if not staged_files:
         return []
 
+    # Get the last commit hash
+    last_commit_hash = repo.head.object.hexsha[:7]
+
     # Since we can't get actual commits for staged changes, we'll create a pseudo-commit
     diff = repo.git.diff('--staged')
     return [{
-        'id': 'staged',
+        'id': last_commit_hash,
         'summary': 'Staged changes',
         'description': '',
         'diff': diff

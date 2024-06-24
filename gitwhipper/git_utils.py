@@ -84,31 +84,16 @@ def get_staged_commits(repo_path='.'):
         'diff': diff
     }]
 
-def get_commit_details(repo_path='.', commit_id='staged'):
-    """Get details (summary, description, diff) for a given commit or staged changes."""
+def get_commit_details(repo_path='.', commit_id='HEAD'):
     repo = git.Repo(repo_path)
-    if commit_id == 'staged':
-        diff = repo.git.diff('--staged')
-        return {
-            'summary': 'Staged changes',
-            'description': '',
-            'diff': diff
-        }
-    else:
-        try:
-            commit = repo.commit(commit_id)
-            return {
-                'summary': commit.summary,
-                'description': commit.message[len(commit.summary):].strip(),
-                'diff': repo.git.show(commit.hexsha)
-            }
-        except git.GitCommandError as e:
-            print(f"Error getting commit details: {str(e)}")
-            return {
-                'summary': 'Error',
-                'description': 'Could not retrieve commit details',
-                'diff': ''
-            }
+    commit = repo.commit(commit_id)
+    return {
+        'id': commit.hexsha,
+        'summary': commit.summary,
+        'description': commit.message[len(commit.summary):].strip(),
+        'diff': repo.git.show(commit.hexsha),
+        'timestamp': commit.committed_date
+    }
         
 def get_commits(repo_path='.', count=10):
     repo = git.Repo(repo_path)
@@ -118,7 +103,7 @@ def get_commits(repo_path='.', count=10):
             'id': commit.hexsha,
             'summary': commit.summary,
             'description': commit.message[len(commit.summary):].strip(),
-            'diff': repo.git.show(commit.hexsha)
+            'timestamp': commit.committed_date
         })
     return commits
 

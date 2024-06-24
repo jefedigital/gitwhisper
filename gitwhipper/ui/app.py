@@ -3,13 +3,14 @@
 import sys
 import os
 import git
+import datetime
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QTextEdit, QPushButton, 
                              QVBoxLayout, QHBoxLayout, QWidget, QFileDialog, QLabel,
                              QMessageBox, QGroupBox, QFormLayout, QListWidget, QSplitter,
                              QMenu, QMenuBar, QTabWidget, QTreeView, QAbstractItemView,
                              QInputDialog)
 from PyQt6.QtCore import Qt, QDir, QModelIndex
-from PyQt6.QtGui import QPalette, QColor, QStandardItemModel, QStandardItem, QDragEnterEvent, QDropEvent
+from PyQt6.QtGui import QPalette, QColor, QStandardItemModel, QStandardItem, QDragEnterEvent, QDropEvent, QTextCharFormat, QBrush, QTextCursor
 from ..git_utils import (is_substantial_change, commit_changes, 
                          is_git_repo, git_add_all, git_push, get_unstaged_changes, 
                          get_staged_changes, get_commits, get_staged_files,
@@ -454,6 +455,41 @@ class GitWhipperUI(QMainWindow):
 
     def show_message(self, message):
         QMessageBox.information(self, "GitWhipper", message)
+
+    def update_commits_list(self):
+        self.commits_list.clear()
+        commits = get_commits(self.current_dir)
+        for commit in commits:
+            commit_date = datetime.datetime.fromtimestamp(commit['timestamp'])
+            formatted_date = commit_date.strftime("%Y-%m-%d %H:%M:%S")
+            self.commits_list.addItem(f"{formatted_date} - {commit['id'][:7]} - {commit['summary']}")
+
+    def show_commit_details(self, item):
+        commit_id = item.text().split(' - ')[1]  # Get the commit ID from the list item
+        details = get_commit_details(self.current_dir, commit_id)
+        self.commit_id_label.setText(f"Commit ID: {commit_id}")
+        self.summary_text.setPlainText(details['summary'])
+        self.description_text.setPlainText(details['description'])
+        self.display_colored_diff(details['diff'])
+
+    def display_colored_diff(self, diff_text):
+        self.diff_text.clear()
+        cursor = self.diff_text.textCursor()
+        lines = diff_text.split('\n')
+        for line in lines:
+            format = QTextCharFormat()
+            if line.startswith('+'):
+                format.setForeground(QBrush(QColor('green')))
+            elif line.startswith('-'):
+                format.setForeground(QBrush(QColor('red')))
+            else:
+                format.setForeground(QBrush(QColor('white')))
+            
+            cursor.insertText(line, format)
+            cursor.insertBlock()  # This inserts a new line
+
+        # Scroll to the top of the diff view
+        self.diff_text.moveCursor(QTextCursor.MoveOperation.Start)
 
 def apply_stylesheet(app):
     app.setStyle("Fusion")

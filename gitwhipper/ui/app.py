@@ -1,20 +1,22 @@
 # gitwhipper/ui/app.py
+
 import sys
 import os
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QTextEdit, QPushButton, 
                              QVBoxLayout, QHBoxLayout, QWidget, QFileDialog, QLabel,
-                             QMessageBox, QGroupBox, QFormLayout)
+                             QMessageBox, QGroupBox, QFormLayout, QListWidget, QSplitter)
 from PyQt6.QtCore import Qt
-from ..git_utils import (get_repo_changes, is_substantial_change, commit_changes, 
+from ..git_utils import (is_substantial_change, commit_changes, 
                          is_git_repo, git_add_all, git_push, get_unstaged_changes, 
-                         get_staged_changes, get_last_commit_id)
+                         get_staged_changes, get_last_commit_id, get_staged_commits,
+                         get_commit_details)
 from ..commit_summary import generate_commit_summary
 
 class GitWhipperUI(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("GitWhipper")
-        self.setGeometry(100, 100, 900, 700)
+        self.setGeometry(100, 100, 1200, 800)
         self.current_dir = os.getcwd()
 
         main_layout = QVBoxLayout()
@@ -32,35 +34,43 @@ class GitWhipperUI(QMainWindow):
         self.git_status_label = QLabel()
         main_layout.addWidget(self.git_status_label)
 
-        # Changes display
-        changes_group = QGroupBox("Changes")
-        changes_layout = QVBoxLayout()
-        self.changes_text = QTextEdit()
-        self.changes_text.setReadOnly(True)
-        changes_layout.addWidget(self.changes_text)
-        changes_group.setLayout(changes_layout)
-        main_layout.addWidget(changes_group)
+        # Splitter for commits list and details
+        splitter = QSplitter(Qt.Orientation.Horizontal)
 
-        # Commit panel
-        commit_group = QGroupBox("Commit")
-        commit_layout = QFormLayout()
+        # Staged Commits List
+        commits_group = QGroupBox("Staged Commits")
+        commits_layout = QVBoxLayout()
+        self.commits_list = QListWidget()
+        self.commits_list.itemClicked.connect(self.show_commit_details)
+        commits_layout.addWidget(self.commits_list)
+        commits_group.setLayout(commits_layout)
+        splitter.addWidget(commits_group)
+
+        # Commit Details
+        details_group = QGroupBox("Commit Details")
+        details_layout = QVBoxLayout()
         
-        self.commit_id_label = QLabel()
-        commit_layout.addRow("Commit ID:", self.commit_id_label)
-        
-        self.summary_label = QLabel("Summary:")
-        commit_layout.addRow(self.summary_label)
+        self.commit_id_label = QLabel("Commit ID:")
+        details_layout.addWidget(self.commit_id_label)
+
+        self.diff_text = QTextEdit()
+        self.diff_text.setReadOnly(True)
+        details_layout.addWidget(QLabel("Diff:"))
+        details_layout.addWidget(self.diff_text)
+
         self.summary_text = QTextEdit()
         self.summary_text.setMaximumHeight(50)
-        commit_layout.addRow(self.summary_text)
-        
-        self.description_label = QLabel("Description:")
-        commit_layout.addRow(self.description_label)
+        details_layout.addWidget(QLabel("Summary:"))
+        details_layout.addWidget(self.summary_text)
+
         self.description_text = QTextEdit()
-        commit_layout.addRow(self.description_text)
-        
-        commit_group.setLayout(commit_layout)
-        main_layout.addWidget(commit_group)
+        details_layout.addWidget(QLabel("Description:"))
+        details_layout.addWidget(self.description_text)
+
+        details_group.setLayout(details_layout)
+        splitter.addWidget(details_group)
+
+        main_layout.addWidget(splitter)
 
         # Buttons
         button_layout = QHBoxLayout()
@@ -106,8 +116,7 @@ class GitWhipperUI(QMainWindow):
             self.generate_button.setEnabled(True)
             self.commit_button.setEnabled(True)
             self.push_button.setEnabled(True)
-            self.update_changes_display()
-            self.update_commit_panel()
+            self.update_staged_commits()
         else:
             self.git_status_label.setText("Not a Git repository")
             self.git_status_label.setStyleSheet("color: red")
@@ -115,32 +124,33 @@ class GitWhipperUI(QMainWindow):
             self.generate_button.setEnabled(False)
             self.commit_button.setEnabled(False)
             self.push_button.setEnabled(False)
-            self.changes_text.clear()
-            self.clear_commit_panel()
+            self.clear_commit_details()
+            self.commits_list.clear()
 
-    def update_changes_display(self):
-        unstaged = get_unstaged_changes(self.current_dir)
-        staged = get_staged_changes(self.current_dir)
-        self.changes_text.setPlainText(f"Unstaged Changes:\n{unstaged}\n\nStaged Changes:\n{staged}")
+    def update_staged_commits(self):
+        self.commits_list.clear()
+        staged_commits = get_staged_commits(self.current_dir)
+        for commit in staged_commits:
+            self.commits_list.addItem(f"{commit['id'][:7]} - {commit['summary']}")
 
-    def update_commit_panel(self):
-        staged_changes = get_staged_changes(self.current_dir)
-        if staged_changes.strip():
-            last_commit_id = get_last_commit_id(self.current_dir)
-            self.commit_id_label.setText(last_commit_id)
-        else:
-            self.clear_commit_panel()
+    def show_commit_details(self, item):
+        commit_id = item.text().split(' - ')[0]
+        details = get_commit_details(self.current_dir, commit_id)
+        self.commit_id_label.setText(f"Commit ID: {commit_id}")
+        self.diff_text.setPlainText(details['diff'])
+        self.summary_text.setPlainText(details['summary'])
+        self.description_text.setPlainText(details['description'])
 
-    def clear_commit_panel(self):
-        self.commit_id_label.clear()
+    def clear_commit_details(self):
+        self.commit_id_label.setText("Commit ID:")
+        self.diff_text.clear()
         self.summary_text.clear()
         self.description_text.clear()
 
     def git_add(self):
         success, message = git_add_all(self.current_dir)
         self.show_message(message)
-        self.update_changes_display()
-        self.update_commit_panel()
+        self.update_staged_commits()
 
     def generate_commit_message(self):
         diff = get_staged_changes(self.current_dir)
@@ -158,8 +168,8 @@ class GitWhipperUI(QMainWindow):
         commit_message = f"{summary}\n\n{description}"
         if commit_changes(self.current_dir, commit_message):
             self.show_message("Changes committed successfully.")
-            self.update_changes_display()
-            self.update_commit_panel()
+            self.update_staged_commits()
+            self.clear_commit_details()
         else:
             self.show_message("Failed to commit changes.")
 

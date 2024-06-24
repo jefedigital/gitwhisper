@@ -229,14 +229,24 @@ class GitWhipperUI(QMainWindow):
         commit_message = f"{summary}\n\n{description}"
         if commit_changes(self.current_dir, commit_message):
             self.show_message("Changes committed successfully.")
+            # Instead of clearing, update the staged commits list
             self.update_staged_commits()
-            self.clear_commit_details()
+            # Clear only the commit message fields
+            self.clear_commit_message_fields()
         else:
             self.show_message("Failed to commit changes.")
+
+    def clear_commit_message_fields(self):
+        self.summary_text.clear()
+        self.description_text.clear()
 
     def git_push(self):
         success, message = git_push(self.current_dir)
         self.show_message(message)
+        if success:
+            # Clear the staged commits list only after a successful push
+            self.commits_list.clear()
+            self.clear_commit_details()
 
     def generate_readme(self):
         if is_git_repo(self.current_dir):

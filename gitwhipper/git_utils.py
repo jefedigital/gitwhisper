@@ -17,10 +17,13 @@ def get_unstaged_changes(repo_path='.'):
     repo = git.Repo(repo_path)
     return repo.git.diff()
 
-def get_staged_changes(repo_path='.'):
-    """Get staged changes in the repository."""
+def get_staged_changes(repo_path: str = '.', file_name: str = None) -> str:
+    """Get staged changes in the repository, optionally for a specific file."""
     repo = git.Repo(repo_path)
-    return repo.git.diff('--staged')
+    if file_name:
+        return repo.git.diff('--staged', '--', file_name)
+    else:
+        return repo.git.diff('--staged')
 
 def is_substantial_change(diff, threshold=10):
     """Determine if changes are substantial based on the number of lines changed."""

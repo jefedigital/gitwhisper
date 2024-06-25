@@ -421,7 +421,7 @@ class GitWhipperUI(QMainWindow):
     def show_staged_file_diff(self, item):
         file_name = item.text()
         diff = get_staged_changes(self.current_dir, file_name)
-        self.diff_text.setPlainText(diff)
+        self.display_colored_diff(diff) 
 
     def clear_commit_details(self):
         self.commit_id_label.setText("Commit ID:")

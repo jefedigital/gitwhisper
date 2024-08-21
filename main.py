@@ -1,9 +1,9 @@
-# gitwhipper/main.py
+# gitwhisper/main.py
 
-from gitwhipper.ui.app import run_app
+from gitwhisper.ui.app import run_app
 
 def main():
-    print("Starting GitWhipper...")
+    print("Starting gitwhisper...")
     run_app()
 
 if __name__ == "__main__":

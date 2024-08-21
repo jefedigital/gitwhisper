@@ -1,4 +1,4 @@
-# gitwhipper/git_utils.py
+# gitwhisper/git_utils.py
 
 import git
 import os

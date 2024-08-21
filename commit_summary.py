@@ -1,4 +1,4 @@
-# gitwhipper/commit_summary.py
+# gitwhisper/commit_summary.py
 
 from .ai_utils import generate_commit_message
 

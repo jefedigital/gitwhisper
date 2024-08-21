@@ -1,4 +1,4 @@
-# gitwhipper/ai_utils.py
+# gitwhisper/ai_utils.py
 
 import os
 import re

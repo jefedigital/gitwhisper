@@ -17,11 +17,6 @@ gitwhisper utilizes LLMs to provide automated assistance for typical Git workflo
 - Streamlined Git workflows
     - Assists with common workflows like branching, merging and diff reviews
 
-## Installation
-
-```
-pip install gitwhisper
-```
 
 gitwhisper requires Python 3.6 or higher. It is compatible with any standard Git installation.
 

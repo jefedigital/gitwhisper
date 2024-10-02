@@ -29,5 +29,3 @@ gitwhisper commit
 ```
 
 gitwhisper will analyze changes and prompt you to review and edit the generated commit message.
-
-To utilize code review assistance
